@@ -33,7 +33,7 @@ We used these 4 stages to visualize a TCP connection:
 # How to Run
 1. Download the Javascript code and add it to Trace-compass. 
 2. Right click on the code and select Run Configuration.
-3. Set Execution Engine to Rhino and Enter process name in script arguments (We used curl for instance).
+3. Set Execution Engine to Rhino and Enter a specific process name in script arguments (We used curl for instance).
 
 # Challenges and Future Enhancements
 Throughout this project, we encountered several challenges, such as determining the specific Kernel functions responsible for handling TCP connections by inspecting the Linux Kernel code. Additionally, we had to thoroughly examine all processes beyond the scope of the curl process to identify any potential connections or dependencies. 
