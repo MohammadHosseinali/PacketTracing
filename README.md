@@ -21,6 +21,14 @@ The resulting LTTng trace file can be effectively analyzed using TraceCompass. A
 
 # EASE Script for Automation and Visualization:
 To automate the analysis process and visualize the TCP connection states, we developed an EASE script in Javascript. This script leverages TraceCompass's capabilities and emulates the default view options available in TraceCompass. By executing the EASE script, users can obtain a graphical representation of TCP connection states in a clear and concise manner.
+We used these 4 stages to visualize a TCP connection: 
+
+1. DNS
+2. Handshake
+3. Data Transmission (Send or Receive)
+4. Connection close
+
+![An output example for command curl](https://github.com/[Mohammad-h78]/[NetworkTracing]/blob/[branch]/image.jpg?raw=true)
 
 # Challenges and Future Enhancements:
 Throughout this project, we encountered several challenges, such as determining the specific Kernel functions responsible for handling TCP connections by inspecting the Linux Kernel code. Additionally, we had to thoroughly examine all processes beyond the scope of the curl process to identify any potential connections or dependencies. 
