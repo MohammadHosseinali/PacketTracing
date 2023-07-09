@@ -15,6 +15,18 @@ To collect the necessary traces, we execute the following steps:
 8. Stop the LTTng tracing.
 9. Destroy the LTTng session.
 
+```
+lttng-sessiond
+lttng create $l
+lttng enable-event -k --syscall --all
+lttng enable-event -k sched_switch,sched_wak'*',irq_'*',net_'*',skb_'*'
+lttng add-context -k -t vtid -t vpid -t procname
+lttng start
+sleep 20
+lttng stop
+lttng destroy
+```
+
 # Trace Analysis
 The resulting LTTng trace file can be effectively analyzed using TraceCompass. After careful examination of the trace file and analyzing the traced Kernel events based on their timestamps and contents in TraceCompass, we successfully identified the events directly associated with the various states of a TCP connection. We further validated our interpretation of these events using Wireshark.
 
