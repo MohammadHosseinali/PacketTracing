@@ -28,7 +28,7 @@ We used these 4 stages to visualize a TCP connection:
 3. Data Transmission (Send or Receive)
 4. Connection close
 
-![An output example for command curl](https://github.com/[Mohammad-h78]/[NetworkTracing]/blob/[branch]/image.jpg?raw=true)
+![An output example for command curl](https://github.com/Mohammad-h78/NetworkTracing/blob/main/Results/ease_screenshot.png?raw=true)
 
 # Challenges and Future Enhancements:
 Throughout this project, we encountered several challenges, such as determining the specific Kernel functions responsible for handling TCP connections by inspecting the Linux Kernel code. Additionally, we had to thoroughly examine all processes beyond the scope of the curl process to identify any potential connections or dependencies. 
