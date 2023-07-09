@@ -1,4 +1,4 @@
-# NetworkTracing
+# Packet Tracing Using EASE analysis
 Visualizing TCP Connection States in TraceCompass using EASE scripting
 
 # Introduction:
