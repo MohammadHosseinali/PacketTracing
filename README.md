@@ -1,5 +1,5 @@
 # Tracing a packet using EASE analysis
-Visualizing TCP Connection States in TraceCompass using EASE scripting
+Visualizing Different network states during a TCP connection using EASE scripting
 
 # Introduction
 This project aims to provide a comprehensive visualization of TCP connection states from the Linux Kernel perspective using TraceCompass and EASE scripting. By analyzing Linux Kernel events related to TCP connections, we gain valuable insights into the inner workings of the connections. To achieve this, we establish a TCP connection to www.example.com using the curl command from the Linux terminal. Simultaneously, we trace the relevant Linux Kernel events using LTTng and a customized bash script.
