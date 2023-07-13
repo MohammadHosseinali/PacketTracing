@@ -25,15 +25,10 @@ function runAnalysis() {
 
 	var event = null;
 	// Parse all events
-	var arr = []
+	var event_array = []
 	var skb_array = []
 
-	var target_process = argv[0]
-	if (target_process == null){
-		print("Please enter a process name as argument in configuration menu!");
-		return;
-	}
-	print(argv[0])
+    var processes_dict = {}
 
 	var target_ip = null;
     var dns_port = null;
@@ -46,14 +41,20 @@ function runAnalysis() {
 	var data_transmission_done = false;
 
 	var current_stage = String()
-
+    target_process = 'curl';
 	while (iter.hasNext()) {
 		//print(iter.length)
 		event = iter.next();
-		
+
+
+		event_name = event.getName()
+		timestamp = event.getTimestamp()
+
+
 		prev_command = getEventFieldValue(event, "prev_comm");
 		next_command = getEventFieldValue(event, "next_comm");
 		procname = getEventFieldValue(event, "context._procname");
+		pid = getEventFieldValue(event, "context._vpid");
 		dport = getEventFieldValue(event, "dport");
 
 
@@ -64,25 +65,30 @@ function runAnalysis() {
 		if (skb_address != null){
 			skb_addr = skb_address.longValue()
 		}
-		
+
 		src_addr = null;
 		dest_addr = null;
 		protocol = null;
-		
-		dns_dest_port = null;
-		dns_src_port = null;
+		seq_number = null;
+		ack_seq_number = null;
+
+		udp_dest_port = null;
+		udp_source_port = null;
+        tcp_source_port = null;
+        tcp_dest_port = null;
 
 		tcp_flags = null;
 
 		netwrok_header = getEventFieldValue(event, "network_header")
 		transport_header = null;
-		
+
 		if (netwrok_header != null){
 			try {
 				src_addr = netwrok_header.getField('saddr').getFormattedValue().toString()
 				dest_addr = netwrok_header.getField('daddr').getFormattedValue().toString()
-				protocol = netwrok_header.getField('protocol').getFormattedValue().toString()	
-			} 
+				protocol = netwrok_header.getField('protocol').getFormattedValue().toString()
+				length = netwrok_header.getField('tot_len').getFormattedValue().toString()
+			}
 			catch (error) {}
 
 			transport_header = netwrok_header.getField('transport_header')
@@ -90,94 +96,219 @@ function runAnalysis() {
 				udp = transport_header.getField('udp')
 				tcp = transport_header.getField('tcp')
 				if (udp != null){
-					dns_src_port = udp.getField('source_port').getFormattedValue().toString()
-					dns_dest_port = udp.getField('dest_port').getFormattedValue().toString()
-					
+					udp_source_port = udp.getField('source_port').getFormattedValue().toString()
+					udp_dest_port = udp.getField('dest_port').getFormattedValue().toString()
+
 					if(procname == target_process && dns_port == null){
-						dns_port = dns_src_port;
+						dns_port = udp_source_port;
 					}
 
-					if (dns_src_port == dns_port)
+					if (udp_source_port == dns_port)
 						dns_requests_sent += 1
-					if (dns_dest_port == dns_port)
-						dns_requests_received += 1		
+					if (udp_dest_port == dns_port)
+						dns_requests_received += 1
 				}
-				
+
 				if (tcp != null){
+					seq_number = tcp.getField('seq').getFormattedValue()
+					ack_seq_number = tcp.getField('ack_seq').getFormattedValue()
+
 					tcp_flags = tcp.getField('flags').getFormattedValue().toString()
+					tcp_source_port = tcp.getField('source_port').getFormattedValue().toString()
+					tcp_dest_port = tcp.getField('dest_port').getFormattedValue().toString()
 					//print(tcp_flags)
 				}
 			}
-			
+
+            if (event_name == "net_dev_queue" || event_name == "net_if_receive_skb"){
+                source_port = tcp_source_port
+                if (source_port == null)
+                    source_port = udp_source_port
+
+                previous_state = null
+				dns_resolved = false
+
+                if (pid+source_port in processes_dict){
+                    previous_state = processes_dict[pid+source_port]["state"]
+					dns_resolved = processes_dict[pid+source_port]["DNS_RESOLVED"]
+				}
+
+                processes_dict[pid+source_port] = {"process_name":procname, "pid":pid, "protocol":protocol, "source_address":src_addr,
+                "dest_address":dest_addr, "tcp_source_port": tcp_source_port, "tcp_dest_port":tcp_dest_port,
+                "udp_source_port": udp_source_port, "udp_dest_port":udp_dest_port, "state":previous_state, "DNS_RESOLVED":dns_resolved,
+				"seq":seq_number, "ack_seq":ack_seq_number}
+
+                if (protocol == '_udp' && (udp_source_port == '53' || udp_dest_port =='53') && !processes_dict[pid+source_port]['DNS_RESOLVED']){
+
+					processes_dict[pid+source_port]["state"] = "DNS"
+					if ("number_of_dns_requests" in processes_dict[pid+source_port])
+						processes_dict[pid+source_port]["number_of_dns_requests"] += 1
+					else
+						processes_dict[pid+source_port]["number_of_dns_requests"] = 1
+
+					for (pid2 in processes_dict){
+						if (processes_dict[pid2]["state"] == "DNS" &&
+							udp_source_port == processes_dict[pid2]["udp_dest_port"] &&
+                        	udp_dest_port == processes_dict[pid2]["udp_source_port"] &&
+							processes_dict[pid+source_port]["number_of_dns_requests"] == processes_dict[pid2]["number_of_dns_requests"]
+							)
+						{
+							processes_dict[pid2]["state"] = null
+							processes_dict[pid+source_port]["state"] = null
+							processes_dict[pid2]["DNS_RESOLVED"] = true
+							processes_dict[pid+source_port]["DNS_RESOLVED"] = true
+						}
+
+					}
+				}
+
+                else if (protocol == '_tcp' && tcp_flags == '0x2'){
+                    processes_dict[pid+source_port]["state"] = "SYN (Waiting for SYN-ACK)"
+
+                }
+
+
+                else if (protocol == '_tcp' && tcp_flags == '0x12'){
+					processes_dict[pid+source_port]["state"] = "SYN-ACK"
+                    for (var pid2 in processes_dict){
+                        if (processes_dict[pid2]["state"] == "SYN (Waiting for SYN-ACK)" &&
+                        tcp_source_port == processes_dict[pid2]["tcp_dest_port"] &&
+                        tcp_dest_port == processes_dict[pid2]["tcp_source_port"]){
+                            processes_dict[pid2]["state"] = null
+                        }
+                    }
+                }
+
+                else if (protocol == '_tcp' && tcp_flags == '0x10'){
+
+                    for (var pid2 in processes_dict){
+						pid2_last_state = processes_dict[pid2]["state"]
+						
+						if (seq_number == processes_dict[pid2]["ack_seq"])
+                            processes_dict[pid2]["state"] = null
+
+						if (seq_number == processes_dict[pid2]["ack_seq"] && pid2_last_state == "FIN_ACK")
+							processes_dict[pid+source_port]["state"] = "LAST ACK (CONNECTION OVER)"
+										
+						else if (processes_dict[pid+source_port]["state"] != "LAST ACK (CONNECTION OVER)")
+							processes_dict[pid+source_port]["state"] = "ACK"
+
+                    }
+
+                }
+				else if (protocol == '_tcp' && tcp_flags == '0x18'){
+
+					for (var pid2 in processes_dict){
+						if (seq_number == processes_dict[pid2]["seq"]){
+							processes_dict[pid2]["state"] = null
+                        }
+                    }
+					processes_dict[pid+source_port]["state"] = "DATA"
+
+				}
+
+				if (protocol == '_tcp' && tcp_flags == '0x11'){
+                    for (var pid2 in processes_dict){
+                        if (processes_dict[pid2]["state"] == "DATA" &&
+                        tcp_source_port == processes_dict[pid2]["tcp_dest_port"] &&
+                        tcp_dest_port == processes_dict[pid2]["tcp_source_port"]){
+                            processes_dict[pid2]["state"] = null
+                        }
+                    }
+
+					for (var pid2 in processes_dict){
+						if (
+							(tcp_source_port == processes_dict[pid2]["tcp_dest_port"] && tcp_dest_port == processes_dict[pid2]["tcp_source_port"]) ||
+						(tcp_source_port == processes_dict[pid2]["tcp_source_port"] && tcp_dest_port == processes_dict[pid2]["tcp_dest_port"])
+						)
+						processes_dict[pid2]["state"] = null
+
+					}
+					processes_dict[pid+source_port]["state"] = "FIN_ACK"
+                }
+
+            }
 		}
 
-		
-		event_name = event.getName()
-		timestamp = event.getTimestamp()
 
-
-		if(procname==target_process || prev_command == target_process || next_command == target_process || target_ip!=null && (src_addr == target_ip || dest_addr == target_ip) || skb_array.indexOf(skb_addr) >= 0 || (dns_port != null && dns_dest_port == dns_port)){
-			if (target_ip == null && protocol == "_tcp"){
-				target_ip = dest_addr;
+        for (var pid in processes_dict){
+            if (processes_dict[pid]["protocol"] == '_tcp'){
+                y_axis_name = processes_dict[pid]["process_name"] + '_'+ processes_dict[pid]["pid"]+" "+ processes_dict[pid]["source_address"].replace(', ', '.') +":"+processes_dict[pid]["tcp_source_port"] + "->" +  processes_dict[pid]["dest_address"].replace(', ', '.')+":"+processes_dict[pid]["tcp_dest_port"]
 			}
+			else if (processes_dict[pid]["protocol"] == '_udp')
+			y_axis_name = processes_dict[pid]["process_name"] + '_'+ processes_dict[pid]["pid"]+" "+ processes_dict[pid]["source_address"].replace(', ', '.') +":"+processes_dict[pid]["udp_source_port"] + "->" +  processes_dict[pid]["dest_address"].replace(', ', '.')+":"+processes_dict[pid]["udp_dest_port"]
 
-			if (skb_addr != null){
-				skb_array.push(skb_addr)
-			}
-							
+			if (processes_dict[pid]["state"] == "DATA")
+				processes_dict[pid]["state"] = "DATA "+"(Length:"+length+")"
 
-			var data = []
-			data.push(event_name)
-			data.push(timestamp)
-			data.push(next_command)
-			arr.push(data)
-
-			stage = ss.getQuarkAbsoluteAndAdd(0);
-			
-			if (dport == 53) 
-				current_stage = "DNS"
-
-			else if (current_stage == "DNS" && dns_requests_sent > 0 && dns_requests_sent == dns_requests_received)
-				current_stage = ""
-			
-			else if (tcp_flags == '0x2'){ //SYN
-				current_stage = "Handshake"
-			}
-			else if (current_stage == "Handshake" && tcp_flags == '0x10'){ //ACK
-				current_stage = ""
-				handshake_done = true;
-			}
+            stage = ss.getQuarkAbsoluteAndAdd(y_axis_name);
+            ss.modifyAttribute(event.getTimestamp().toNanos(), processes_dict[pid]['state'], stage);
+        }
 
 
-			else if (handshake_done && event_name == 'syscall_entry_sendto'){
-				current_stage = "Data Transmission";
-			}
-			
-			else if (current_stage == "Data Transmission" && tcp_flags == '0x11'){
-				current_stage = ""
-				data_transmission_done = true;
-			}
 
-			else if (data_transmission_done && tcp_flags == '0x10'){
-				current_stage = "Connection Close"
-			}
-			
-			else if (current_stage == "Connection Close" && event_name == 'skb_kfree'){
-				current_stage = ""
-			}
+		// if(procname==target_process || prev_command == target_process || next_command == target_process || target_ip!=null && (src_addr == target_ip || dest_addr == target_ip) || skb_array.indexOf(skb_addr) >= 0 || (dns_port != null && udp_dest_port == dns_port)){
+		// 	if (target_ip == null && protocol == "_tcp"){
+		// 		target_ip = dest_addr;
+		// 	}
 
-			ss.modifyAttribute(event.getTimestamp().toNanos(), current_stage, stage);
-			
+		// 	if (skb_addr != null){
+		// 		skb_array.push(skb_addr)
+		// 	}
 
-		}
+
+		// 	var data = []
+		// 	data.push(event_name)
+		// 	data.push(timestamp)
+		// 	data.push(next_command)
+		// 	event_array.push(data)
+
+		// 	stage = ss.getQuarkAbsoluteAndAdd(0);
+
+		// 	if (dport == 53)
+		// 		current_stage = "DNS"
+
+		// 	else if (current_stage == "DNS" && dns_requests_sent > 0 && dns_requests_sent == dns_requests_received)
+		// 		current_stage = null
+
+		// 	else if (tcp_flags == '0x2'){ //SYN
+		// 		current_stage = "Handshake"
+		// 	}
+		// 	else if (current_stage == "Handshake" && tcp_flags == '0x10'){ //ACK
+		// 		current_stage = null
+		// 		handshake_done = true;
+		// 	}
+
+
+		// 	else if (handshake_done && event_name == 'syscall_entry_sendto'){
+		// 		current_stage = "DATA";
+		// 	}
+
+		// 	else if (current_stage == "DATA" && tcp_flags == '0x11'){
+		// 		current_stage = null
+		// 		data_transmission_done = true;
+		// 	}
+
+		// 	else if (data_transmission_done && tcp_flags == '0x10'){
+		// 		current_stage = "Connection Close"
+		// 	}
+
+		// 	else if (current_stage == "Connection Close" && event_name == 'skb_kfree'){
+		// 		current_stage = null
+		// 	}
+
+		// 	ss.modifyAttribute(event.getTimestamp().toNanos(), current_stage, stage);
+
+
+		// }
 
 	}
 
-	for (let i = 0; i < arr.length; i++){
-		print(arr[i][0] + " " + arr[i][1]);
+	for (let i = 0; i < event_array.length; i++){
+		print(event_array[i][0] + " " + event_array[i][1]);
 	}
 
-	print(arr.length)
+	print(event_array.length)
 	// Done parsing the events, close the state system at the time of the last event, it needs to be done manually otherwise the state system will still be waiting for values and will not be considered finished building
 	if (event != null) {
 		ss.closeHistory(event.getTimestamp().toNanos());
