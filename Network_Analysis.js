@@ -26,22 +26,14 @@ function runAnalysis() {
 	var event = null;
 	// Parse all events
 	var event_array = []
-	var skb_array = []
 
     var processes_dict = {}
-
-	var target_ip = null;
     var dns_port = null;
-
 	var dns_requests_sent = 0;
 	var dns_requests_received = 0;
+	
 
 
-	var handshake_done = false;
-	var data_transmission_done = false;
-
-	var current_stage = String()
-    target_process = 'curl';
 	while (iter.hasNext()) {
 		//print(iter.length)
 		event = iter.next();
@@ -99,9 +91,7 @@ function runAnalysis() {
 					udp_source_port = udp.getField('source_port').getFormattedValue().toString()
 					udp_dest_port = udp.getField('dest_port').getFormattedValue().toString()
 
-					if(procname == target_process && dns_port == null){
-						dns_port = udp_source_port;
-					}
+					dns_port = udp_source_port;
 
 					if (udp_source_port == dns_port)
 						dns_requests_sent += 1
@@ -244,63 +234,6 @@ function runAnalysis() {
             stage = ss.getQuarkAbsoluteAndAdd(y_axis_name);
             ss.modifyAttribute(event.getTimestamp().toNanos(), processes_dict[pid]['state'], stage);
         }
-
-
-
-		// if(procname==target_process || prev_command == target_process || next_command == target_process || target_ip!=null && (src_addr == target_ip || dest_addr == target_ip) || skb_array.indexOf(skb_addr) >= 0 || (dns_port != null && udp_dest_port == dns_port)){
-		// 	if (target_ip == null && protocol == "_tcp"){
-		// 		target_ip = dest_addr;
-		// 	}
-
-		// 	if (skb_addr != null){
-		// 		skb_array.push(skb_addr)
-		// 	}
-
-
-		// 	var data = []
-		// 	data.push(event_name)
-		// 	data.push(timestamp)
-		// 	data.push(next_command)
-		// 	event_array.push(data)
-
-		// 	stage = ss.getQuarkAbsoluteAndAdd(0);
-
-		// 	if (dport == 53)
-		// 		current_stage = "DNS"
-
-		// 	else if (current_stage == "DNS" && dns_requests_sent > 0 && dns_requests_sent == dns_requests_received)
-		// 		current_stage = null
-
-		// 	else if (tcp_flags == '0x2'){ //SYN
-		// 		current_stage = "Handshake"
-		// 	}
-		// 	else if (current_stage == "Handshake" && tcp_flags == '0x10'){ //ACK
-		// 		current_stage = null
-		// 		handshake_done = true;
-		// 	}
-
-
-		// 	else if (handshake_done && event_name == 'syscall_entry_sendto'){
-		// 		current_stage = "DATA";
-		// 	}
-
-		// 	else if (current_stage == "DATA" && tcp_flags == '0x11'){
-		// 		current_stage = null
-		// 		data_transmission_done = true;
-		// 	}
-
-		// 	else if (data_transmission_done && tcp_flags == '0x10'){
-		// 		current_stage = "Connection Close"
-		// 	}
-
-		// 	else if (current_stage == "Connection Close" && event_name == 'skb_kfree'){
-		// 		current_stage = null
-		// 	}
-
-		// 	ss.modifyAttribute(event.getTimestamp().toNanos(), current_stage, stage);
-
-
-		// }
 
 	}
 
