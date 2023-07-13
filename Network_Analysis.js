@@ -29,8 +29,7 @@ function runAnalysis() {
 
     var processes_dict = {}
     var dns_port = null;
-	var dns_requests_sent = 0;
-	var dns_requests_received = 0;
+
 	
 
 
@@ -93,10 +92,6 @@ function runAnalysis() {
 
 					dns_port = udp_source_port;
 
-					if (udp_source_port == dns_port)
-						dns_requests_sent += 1
-					if (udp_dest_port == dns_port)
-						dns_requests_received += 1
 				}
 
 				if (tcp != null){
