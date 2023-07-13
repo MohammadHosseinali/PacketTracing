@@ -34,11 +34,7 @@ The resulting LTTng trace file can be effectively analyzed using TraceCompass. A
 To automate the analysis process and visualize the TCP connection states, we developed an EASE script in Javascript. This script leverages TraceCompass's capabilities and emulates the default view options available in TraceCompass. By executing the EASE script, users can obtain a graphical representation of TCP connection states in a clear and concise manner.
 We used different states to visualize a FULL connection. 
 
-For example: 
-1. DNS
-2. Handshake (SYN, SYN-ACK, ACK)
-3. Data Transmission and Acknowledgements
-
+Example result:
 ![An output example](https://github.com/Mohammad-h78/PacketTracing/blob/main/Results/Screenshot1.png?raw=true)
 
 ![An output example2](https://github.com/Mohammad-h78/PacketTracing/blob/main/Results/Screenshot2.png?raw=true)
