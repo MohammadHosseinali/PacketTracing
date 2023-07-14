@@ -25,12 +25,7 @@ function runAnalysis() {
 
 	var event = null;
 	// Parse all events
-	var event_array = []
-
     var processes_dict = {}
-    var dns_port = null;
-
-	
 
 
 	while (iter.hasNext()) {
@@ -90,7 +85,6 @@ function runAnalysis() {
 					udp_source_port = udp.getField('source_port').getFormattedValue().toString()
 					udp_dest_port = udp.getField('dest_port').getFormattedValue().toString()
 
-					dns_port = udp_source_port;
 
 				}
 
@@ -232,11 +226,7 @@ function runAnalysis() {
 
 	}
 
-	for (let i = 0; i < event_array.length; i++){
-		print(event_array[i][0] + " " + event_array[i][1]);
-	}
 
-	print(event_array.length)
 	// Done parsing the events, close the state system at the time of the last event, it needs to be done manually otherwise the state system will still be waiting for values and will not be considered finished building
 	if (event != null) {
 		ss.closeHistory(event.getTimestamp().toNanos());
